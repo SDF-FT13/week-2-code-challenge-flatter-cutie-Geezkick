@@ -1,38 +1,94 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Flatacuties</title>
-    <link rel="stylesheet" type="text/css" href="style.css" />
-  </head>
-  <body>
-    <div class="logo">
-      <h1>Flatacuties</h1>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flatter-Cuttie Code Challenge</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+            text-align: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        #container {
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        #dogs-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .dog-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .dog-card:hover {
+            transform: scale(1.05);
+        }
+
+        .dog-card img {
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #ff6347;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #ff4500;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            .dog-card {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Flatter-Cuttie: Adorable Dogs Gallery</h1>
+        <div id="dogs-gallery"></div>
+        <button id="loadMoreBtn">🐶 Load More Dogs</button>
     </div>
-    <div id="character-bar"></div>
-    <div class="characterInfo">
-      <div id="detailed-info">
-        <p id="name-display">Character's Name</p>
-        <img id="image" src="assets/dummy.gif" alt="Character's Name" />
-        <h4>Total Votes: <span id="vote-count">0</span></h4>
-        <form id="votes-form">
-          <input type="number" placeholder="Enter Votes" id="votes" name="votes" min="1" />
-          <input type="submit" value="Add Votes" />
-        </form>
-        <button id="reset-btn">Reset Votes</button>
-      </div>
-      <h4>Add New Character</h4>
-      <form id="character-form">
-        <div>
-          <label for="new-name">Name</label>
-          <input type="text" id="new-name" name="new-name" />
-        </div>
-        <div>
-          <label for="image-url">Image URL</label>
-          <input type="text" id="image-url" name="image-url" />
-        </div>
-        <input type="submit" value="Add Character" />
-      </form>
-    </div>
-    <script src="src/index.js"></script>
-  </body>
+    <script src="script.js"></script>
+</body>
 </html>
