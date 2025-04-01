@@ -40,7 +40,11 @@ async function updateVotes(characterId, votes) {
             body: JSON.stringify({ votes }),
         });
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        return await response.json();
+        const updatedCharacter = await response.json();
+        // Update local state
+        const index = characters.findIndex(c => c.id === characterId);
+        if (index !== -1) characters[index] = updatedCharacter;
+        return updatedCharacter;
     } catch (error) {
         console.error('Update votes error:', error);
         elements.voteCount.textContent = 'Error';
@@ -56,7 +60,9 @@ async function addNewCharacter(name, image) {
             body: JSON.stringify({ name, image, votes: 0 }),
         });
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        return await response.json();
+        const newCharacter = await response.json();
+        characters.push(newCharacter);
+        return newCharacter;
     } catch (error) {
         console.error('Add character error:', error);
         elements.nameDisplay.textContent = 'Error adding character';
@@ -98,8 +104,7 @@ function handleVoteSubmit(event) {
     const newVotes = character.votes + votesToAdd;
     updateVotes(currentCharacterId, newVotes).then(updatedCharacter => {
         if (updatedCharacter) {
-            character.votes = updatedCharacter.votes;
-            elements.voteCount.textContent = updatedCharacter.votes;
+            showCharacterDetails(currentCharacterId); // Refresh UI
             elements.votesInput.value = '';
         }
     });
@@ -109,9 +114,7 @@ function handleReset() {
     if (!currentCharacterId) return;
     updateVotes(currentCharacterId, 0).then(updatedCharacter => {
         if (updatedCharacter) {
-            const character = characters.find(c => c.id === currentCharacterId);
-            character.votes = updatedCharacter.votes;
-            elements.voteCount.textContent = updatedCharacter.votes;
+            showCharacterDetails(currentCharacterId); // Refresh UI
         }
     });
 }
@@ -124,7 +127,6 @@ function handleNewCharacter(event) {
 
     addNewCharacter(name, image).then(newCharacter => {
         if (newCharacter) {
-            characters.push(newCharacter);
             renderCharacterBar();
             showCharacterDetails(newCharacter.id);
             elements.characterForm.reset();
