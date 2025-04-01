@@ -15,49 +15,44 @@ const DOM = {
 };
 
 // State
-let characters = [];
-let currentCharacterId = null;
+let state = {
+    characters: [],
+    currentCharacterId: null,
+};
 
 // API Functions
 async function fetchCharacters() {
     try {
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error('Failed to fetch characters');
-        characters = await response.json();
-        console.log('Fetched characters:', characters);
-        return characters;
+        state.characters = await response.json();
+        console.log('Fetched characters:', state.characters);
     } catch (error) {
         console.error('Fetch error:', error);
         DOM.nameDisplay.textContent = 'Error loading characters';
-        return [];
+        state.characters = [];
     }
 }
 
-async function patchVotes(characterId, votes) {
+async function syncVotes(characterId, votes) {
     try {
-        console.log('Patching votes for ID:', characterId, 'to:', votes);
+        console.log(`Syncing votes for ID ${characterId} to ${votes}`);
         const response = await fetch(`${API_URL}/${characterId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ votes }),
         });
-        if (!response.ok) throw new Error('Failed to update votes');
+        if (!response.ok) throw new Error('Failed to sync votes');
         const updatedCharacter = await response.json();
-        console.log('Server response:', updatedCharacter);
-        const index = characters.findIndex(c => c.id === characterId);
-        if (index !== -1) {
-            characters[index] = updatedCharacter;
-            console.log('Updated local characters:', characters);
-        }
-        return updatedCharacter;
+        console.log('Server updated:', updatedCharacter);
+        return true;
     } catch (error) {
-        console.error('Patch error:', error);
-        DOM.voteCount.textContent = 'Error';
-        return null;
+        console.error('Sync error:', error);
+        return false;
     }
 }
 
-async function postCharacter(name, image) {
+async function addCharacterToServer(name, image) {
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -66,12 +61,10 @@ async function postCharacter(name, image) {
         });
         if (!response.ok) throw new Error('Failed to add character');
         const newCharacter = await response.json();
-        console.log('New character added:', newCharacter);
-        characters.push(newCharacter);
+        console.log('Added to server:', newCharacter);
         return newCharacter;
     } catch (error) {
         console.error('Post error:', error);
-        DOM.nameDisplay.textContent = 'Error adding character';
         return null;
     }
 }
@@ -79,67 +72,68 @@ async function postCharacter(name, image) {
 // DOM Manipulation
 function renderCharacterBar() {
     DOM.characterBar.innerHTML = '';
-    characters.forEach(character => {
+    state.characters.forEach(character => {
         const span = document.createElement('span');
         span.textContent = character.name;
         span.addEventListener('click', () => {
-            currentCharacterId = character.id;
-            displayCharacterDetails(character.id);
+            state.currentCharacterId = character.id;
+            renderDetails();
         });
         DOM.characterBar.appendChild(span);
     });
 }
 
-function displayCharacterDetails(characterId) {
-    const character = characters.find(c => c.id === characterId);
+function renderDetails() {
+    const character = state.characters.find(c => c.id === state.currentCharacterId);
     if (!character) {
-        console.error('Character not found for ID:', characterId);
-        DOM.nameDisplay.textContent = 'Character not found';
+        DOM.nameDisplay.textContent = 'Select a character';
+        DOM.image.src = 'assets/dummy.gif';
+        DOM.voteCount.textContent = '0';
         return;
     }
     DOM.nameDisplay.textContent = character.name;
     DOM.image.src = character.image;
     DOM.image.alt = character.name;
     DOM.voteCount.textContent = character.votes;
-    console.log('Displayed character:', character);
+    console.log('Rendered details:', character);
 }
 
 // Event Handlers
 function handleVoteSubmit(e) {
     e.preventDefault();
     const votesToAdd = parseInt(DOM.votesInput.value, 10);
-    if (!currentCharacterId || isNaN(votesToAdd) || votesToAdd <= 0) {
-        console.log('Invalid vote input or no character selected:', votesToAdd, currentCharacterId);
+    if (!state.currentCharacterId || isNaN(votesToAdd) || votesToAdd <= 0) {
+        console.log('Invalid vote input:', votesToAdd, state.currentCharacterId);
         DOM.votesInput.value = '';
         return;
     }
 
-    const character = characters.find(c => c.id === currentCharacterId);
+    const character = state.characters.find(c => c.id === state.currentCharacterId);
     if (!character) {
-        console.error('No character found for ID:', currentCharacterId);
+        console.error('Character not found:', state.currentCharacterId);
         return;
     }
-    const newVotes = character.votes + votesToAdd;
-    console.log(`Adding ${votesToAdd} votes to ${character.votes}, new total: ${newVotes}`);
-    patchVotes(currentCharacterId, newVotes).then(updatedCharacter => {
-        if (updatedCharacter) {
-            displayCharacterDetails(currentCharacterId);
-            DOM.votesInput.value = '';
-        }
-    });
+    character.votes = (character.votes || 0) + votesToAdd;
+    console.log(`Votes added: ${votesToAdd}, new total: ${character.votes}`);
+    renderDetails(); // Update UI immediately
+    syncVotes(character.id, character.votes); // Sync with server
+    DOM.votesInput.value = '';
 }
 
 function handleReset() {
-    if (!currentCharacterId) {
+    if (!state.currentCharacterId) {
         console.log('No character selected for reset');
         return;
     }
-    console.log('Resetting votes for ID:', currentCharacterId);
-    patchVotes(currentCharacterId, 0).then(updatedCharacter => {
-        if (updatedCharacter) {
-            displayCharacterDetails(currentCharacterId);
-        }
-    });
+    const character = state.characters.find(c => c.id === state.currentCharacterId);
+    if (!character) {
+        console.error('Character not found:', state.currentCharacterId);
+        return;
+    }
+    character.votes = 0;
+    console.log('Votes reset to 0');
+    renderDetails(); // Update UI immediately
+    syncVotes(character.id, 0); // Sync with server
 }
 
 function handleNewCharacter(e) {
@@ -147,34 +141,33 @@ function handleNewCharacter(e) {
     const name = DOM.newName.value.trim();
     const image = DOM.imageUrl.value.trim();
     if (!name || !image) {
-        console.log('Invalid new character input:', name, image);
+        console.log('Invalid input for new character:', name, image);
         return;
     }
-    postCharacter(name, image).then(newCharacter => {
+
+    addCharacterToServer(name, image).then(newCharacter => {
         if (newCharacter) {
+            state.characters.push(newCharacter);
             renderCharacterBar();
-            currentCharacterId = newCharacter.id;
-            displayCharacterDetails(newCharacter.id);
+            state.currentCharacterId = newCharacter.id;
+            renderDetails();
             DOM.characterForm.reset();
         }
     });
 }
 
 // Initialization
-function init() {
+async function init() {
     DOM.votesForm.addEventListener('submit', handleVoteSubmit);
     DOM.resetBtn.addEventListener('click', handleReset);
     DOM.characterForm.addEventListener('submit', handleNewCharacter);
 
-    fetchCharacters().then(data => {
-        if (data.length) {
-            renderCharacterBar();
-            currentCharacterId = data[0].id;
-            displayCharacterDetails(data[0].id);
-        } else {
-            console.log('No characters available');
-        }
-    });
+    await fetchCharacters();
+    if (state.characters.length) {
+        renderCharacterBar();
+        state.currentCharacterId = state.characters[0].id;
+        renderDetails();
+    }
 }
 
 init();
