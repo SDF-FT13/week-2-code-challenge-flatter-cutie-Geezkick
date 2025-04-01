@@ -1,7 +1,7 @@
 const API_URL = 'http://localhost:3000/characters';
 
 // DOM Elements
-const elements = {
+const DOM = {
     characterBar: document.getElementById('character-bar'),
     nameDisplay: document.getElementById('name-display'),
     image: document.getElementById('image'),
@@ -10,8 +10,8 @@ const elements = {
     votesInput: document.getElementById('votes'),
     resetBtn: document.getElementById('reset-btn'),
     characterForm: document.getElementById('character-form'),
-    newNameInput: document.getElementById('new-name'),
-    imageUrlInput: document.getElementById('image-url'),
+    newName: document.getElementById('new-name'),
+    imageUrl: document.getElementById('image-url'),
 };
 
 // State
@@ -22,128 +22,157 @@ let currentCharacterId = null;
 async function fetchCharacters() {
     try {
         const response = await fetch(API_URL);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!response.ok) throw new Error('Failed to fetch characters');
         characters = await response.json();
+        console.log('Fetched characters:', characters);
         return characters;
     } catch (error) {
-        console.error('Fetch characters error:', error);
-        elements.nameDisplay.textContent = 'Error loading characters';
+        console.error('Fetch error:', error);
+        DOM.nameDisplay.textContent = 'Error loading characters';
         return [];
     }
 }
 
-async function updateVotes(characterId, votes) {
+async function patchVotes(characterId, votes) {
     try {
+        console.log('Patching votes for ID:', characterId, 'to:', votes);
         const response = await fetch(`${API_URL}/${characterId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ votes }),
         });
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!response.ok) throw new Error('Failed to update votes');
         const updatedCharacter = await response.json();
-        // Update local state
+        console.log('Server response:', updatedCharacter);
         const index = characters.findIndex(c => c.id === characterId);
-        if (index !== -1) characters[index] = updatedCharacter;
+        if (index !== -1) {
+            characters[index] = updatedCharacter;
+            console.log('Updated local characters:', characters);
+        }
         return updatedCharacter;
     } catch (error) {
-        console.error('Update votes error:', error);
-        elements.voteCount.textContent = 'Error';
+        console.error('Patch error:', error);
+        DOM.voteCount.textContent = 'Error';
         return null;
     }
 }
 
-async function addNewCharacter(name, image) {
+async function postCharacter(name, image) {
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, image, votes: 0 }),
         });
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!response.ok) throw new Error('Failed to add character');
         const newCharacter = await response.json();
+        console.log('New character added:', newCharacter);
         characters.push(newCharacter);
         return newCharacter;
     } catch (error) {
-        console.error('Add character error:', error);
-        elements.nameDisplay.textContent = 'Error adding character';
+        console.error('Post error:', error);
+        DOM.nameDisplay.textContent = 'Error adding character';
         return null;
     }
 }
 
-// DOM Manipulation Functions
+// DOM Manipulation
 function renderCharacterBar() {
-    elements.characterBar.innerHTML = '';
+    DOM.characterBar.innerHTML = '';
     characters.forEach(character => {
         const span = document.createElement('span');
         span.textContent = character.name;
-        span.addEventListener('click', () => showCharacterDetails(character.id));
-        elements.characterBar.appendChild(span);
+        span.addEventListener('click', () => {
+            currentCharacterId = character.id;
+            displayCharacterDetails(character.id);
+        });
+        DOM.characterBar.appendChild(span);
     });
 }
 
-function showCharacterDetails(characterId) {
+function displayCharacterDetails(characterId) {
     const character = characters.find(c => c.id === characterId);
-    if (!character) return;
-    currentCharacterId = characterId;
-    elements.nameDisplay.textContent = character.name;
-    elements.image.src = character.image;
-    elements.image.alt = character.name;
-    elements.voteCount.textContent = character.votes;
+    if (!character) {
+        console.error('Character not found for ID:', characterId);
+        DOM.nameDisplay.textContent = 'Character not found';
+        return;
+    }
+    DOM.nameDisplay.textContent = character.name;
+    DOM.image.src = character.image;
+    DOM.image.alt = character.name;
+    DOM.voteCount.textContent = character.votes;
+    console.log('Displayed character:', character);
 }
 
 // Event Handlers
-function handleVoteSubmit(event) {
-    event.preventDefault();
-    const votesToAdd = parseInt(elements.votesInput.value, 10);
+function handleVoteSubmit(e) {
+    e.preventDefault();
+    const votesToAdd = parseInt(DOM.votesInput.value, 10);
     if (!currentCharacterId || isNaN(votesToAdd) || votesToAdd <= 0) {
-        elements.votesInput.value = '';
+        console.log('Invalid vote input or no character selected:', votesToAdd, currentCharacterId);
+        DOM.votesInput.value = '';
         return;
     }
 
     const character = characters.find(c => c.id === currentCharacterId);
+    if (!character) {
+        console.error('No character found for ID:', currentCharacterId);
+        return;
+    }
     const newVotes = character.votes + votesToAdd;
-    updateVotes(currentCharacterId, newVotes).then(updatedCharacter => {
+    console.log(`Adding ${votesToAdd} votes to ${character.votes}, new total: ${newVotes}`);
+    patchVotes(currentCharacterId, newVotes).then(updatedCharacter => {
         if (updatedCharacter) {
-            showCharacterDetails(currentCharacterId); // Refresh UI
-            elements.votesInput.value = '';
+            displayCharacterDetails(currentCharacterId);
+            DOM.votesInput.value = '';
         }
     });
 }
 
 function handleReset() {
-    if (!currentCharacterId) return;
-    updateVotes(currentCharacterId, 0).then(updatedCharacter => {
+    if (!currentCharacterId) {
+        console.log('No character selected for reset');
+        return;
+    }
+    console.log('Resetting votes for ID:', currentCharacterId);
+    patchVotes(currentCharacterId, 0).then(updatedCharacter => {
         if (updatedCharacter) {
-            showCharacterDetails(currentCharacterId); // Refresh UI
+            displayCharacterDetails(currentCharacterId);
         }
     });
 }
 
-function handleNewCharacter(event) {
-    event.preventDefault();
-    const name = elements.newNameInput.value.trim();
-    const image = elements.imageUrlInput.value.trim();
-    if (!name || !image) return;
-
-    addNewCharacter(name, image).then(newCharacter => {
+function handleNewCharacter(e) {
+    e.preventDefault();
+    const name = DOM.newName.value.trim();
+    const image = DOM.imageUrl.value.trim();
+    if (!name || !image) {
+        console.log('Invalid new character input:', name, image);
+        return;
+    }
+    postCharacter(name, image).then(newCharacter => {
         if (newCharacter) {
             renderCharacterBar();
-            showCharacterDetails(newCharacter.id);
-            elements.characterForm.reset();
+            currentCharacterId = newCharacter.id;
+            displayCharacterDetails(newCharacter.id);
+            DOM.characterForm.reset();
         }
     });
 }
 
-// Initialize
+// Initialization
 function init() {
-    elements.votesForm.addEventListener('submit', handleVoteSubmit);
-    elements.resetBtn.addEventListener('click', handleReset);
-    elements.characterForm.addEventListener('submit', handleNewCharacter);
+    DOM.votesForm.addEventListener('submit', handleVoteSubmit);
+    DOM.resetBtn.addEventListener('click', handleReset);
+    DOM.characterForm.addEventListener('submit', handleNewCharacter);
 
     fetchCharacters().then(data => {
         if (data.length) {
             renderCharacterBar();
-            showCharacterDetails(data[0].id);
+            currentCharacterId = data[0].id;
+            displayCharacterDetails(data[0].id);
+        } else {
+            console.log('No characters available');
         }
     });
 }
