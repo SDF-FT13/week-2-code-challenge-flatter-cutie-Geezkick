@@ -22,6 +22,7 @@
             text-align: center;
             flex-direction: column;
             padding: 20px;
+            transition: background 0.3s;
         }
 
         #container {
@@ -32,6 +33,16 @@
         h1 {
             font-size: 2rem;
             margin-bottom: 20px;
+        }
+
+        #searchBar, #breedFilter {
+            width: 80%;
+            max-width: 400px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
         }
 
         #dogs-gallery {
@@ -47,6 +58,7 @@
             padding: 15px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease-in-out;
+            position: relative;
         }
 
         .dog-card:hover {
@@ -56,6 +68,36 @@
         .dog-card img {
             width: 100%;
             border-radius: 8px;
+        }
+
+        .like-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .like-btn, .dislike-btn {
+            background: #ff4500;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.3s ease-in-out;
+        }
+
+        .like-btn:hover, .dislike-btn:hover {
+            background: #d63400;
+        }
+
+        .delete-btn {
+            background: #d11a2a;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
         }
 
         button {
@@ -73,6 +115,11 @@
             background-color: #ff4500;
         }
 
+        .dark-mode {
+            background-color: #222;
+            color: white;
+        }
+
         @media (max-width: 600px) {
             h1 {
                 font-size: 1.5rem;
@@ -86,9 +133,129 @@
 <body>
     <div id="container">
         <h1>Flatter-Cuttie: Adorable Dogs Gallery</h1>
+        <input type="text" id="searchBar" placeholder="Search for a dog...">
+        <select id="breedFilter">
+            <option value="">Filter by Breed</option>
+            <!-- Dynamically populated -->
+        </select>
+        <button id="toggleDarkMode">🌙 Toggle Dark Mode</button>
         <div id="dogs-gallery"></div>
         <button id="loadMoreBtn">🐶 Load More Dogs</button>
     </div>
-    <script src="script.js"></script>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const dogsGallery = document.getElementById("dogs-gallery");
+            const loadMoreBtn = document.getElementById("loadMoreBtn");
+            const toggleDarkModeBtn = document.getElementById("toggleDarkMode");
+            const searchBar = document.getElementById("searchBar");
+            const breedFilter = document.getElementById("breedFilter");
+            let pageNumber = 1;
+            const dogsPerPage = 6;
+
+            // Function to fetch dog data
+            function fetchDogData() {
+                fetch(`https://dog.ceo/api/breeds/image/random/${dogsPerPage}?page=${pageNumber}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        renderDogs(data.message);
+                    })
+                    .catch(error => console.error('Error fetching dog data:', error));
+            }
+
+            // Function to render dogs
+            function renderDogs(dogs) {
+                dogs.forEach(dog => {
+                    const dogCard = document.createElement("div");
+                    dogCard.classList.add("dog-card");
+    
+                    const dogImage = document.createElement("img");
+                    dogImage.src = dog;
+                    dogImage.alt = "Cute Dog";
+                    dogCard.dataset.name = "Dog";
+
+                    // Voting system: Like/Dislike
+                    const likeContainer = document.createElement("div");
+                    likeContainer.classList.add("like-container");
+                    
+                    const likeButton = document.createElement("button");
+                    likeButton.classList.add("like-btn");
+                    likeButton.textContent = "❤️ 0";
+                    likeButton.addEventListener("click", () => {
+                        let count = parseInt(likeButton.textContent.split(" ")[1]) + 1;
+                        likeButton.textContent = `❤️ ${count}`;
+                    });
+
+                    const dislikeButton = document.createElement("button");
+                    dislikeButton.classList.add("dislike-btn");
+                    dislikeButton.textContent = "👎 0";
+                    dislikeButton.addEventListener("click", () => {
+                        let count = parseInt(dislikeButton.textContent.split(" ")[1]) + 1;
+                        dislikeButton.textContent = `👎 ${count}`;
+                    });
+
+                    const deleteButton = document.createElement("button");
+                    deleteButton.classList.add("delete-btn");
+                    deleteButton.textContent = "🗑️";
+                    deleteButton.addEventListener("click", () => {
+                        dogCard.remove();
+                    });
+
+                    likeContainer.appendChild(likeButton);
+                    likeContainer.appendChild(dislikeButton);
+                    likeContainer.appendChild(deleteButton);
+
+                    dogCard.appendChild(dogImage);
+                    dogCard.appendChild(likeContainer);
+                    dogsGallery.appendChild(dogCard);
+                });
+            }
+
+            // Search Functionality
+            searchBar.addEventListener("input", (e) => {
+                const searchValue = e.target.value.toLowerCase();
+                document.querySelectorAll(".dog-card").forEach(card => {
+                    const name = card.dataset.name.toLowerCase();
+                    card.style.display = name.includes(searchValue) ? "block" : "none";
+                });
+            });
+
+            // Breed filter functionality
+            function fetchBreedList() {
+                fetch('https://dog.ceo/api/breeds/list/all')
+                    .then(response => response.json())
+                    .then(data => {
+                        const breeds = Object.keys(data.message);
+                        breeds.forEach(breed => {
+                            const option = document.createElement("option");
+                            option.value = breed;
+                            option.textContent = breed.charAt(0).toUpperCase() + breed.slice(1);
+                            breedFilter.appendChild(option);
+                        });
+                    })
+                    .catch(error => console.error('Error fetching breed list:', error));
+            }
+
+            breedFilter.addEventListener("change", (e) => {
+                const breed = e.target.value;
+                fetchDogData(breed);
+            });
+
+            // Dark mode toggle
+            toggleDarkModeBtn.addEventListener("click", () => {
+                document.body.classList.toggle("dark-mode");
+            });
+
+            // Load more dogs on button click
+            loadMoreBtn.addEventListener("click", () => {
+                pageNumber++;
+                fetchDogData();
+            });
+
+            // Initial fetch
+            fetchBreedList();
+            fetchDogData();
+        });
+    </script>
 </body>
 </html>
