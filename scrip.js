@@ -1,140 +1,149 @@
 const API_URL = 'http://localhost:3000/characters';
 
 // DOM Elements
-const characterBar = document.getElementById('character-bar');
-const nameDisplay = document.getElementById('name');
-const imageDisplay = document.getElementById('image');
-const voteCountDisplay = document.getElementById('vote-count');
-const votesForm = document.getElementById('votes-form');
-const votesInput = document.getElementById('votes');
-const resetBtn = document.getElementById('reset-btn');
-const characterForm = document.getElementById('character-form');
+const elements = {
+    characterBar: document.getElementById('character-bar'),
+    nameDisplay: document.getElementById('name-display'),
+    image: document.getElementById('image'),
+    voteCount: document.getElementById('vote-count'),
+    votesForm: document.getElementById('votes-form'),
+    votesInput: document.getElementById('votes'),
+    resetBtn: document.getElementById('reset-btn'),
+    characterForm: document.getElementById('character-form'),
+    newNameInput: document.getElementById('new-name'),
+    imageUrlInput: document.getElementById('image-url'),
+};
 
-let currentCharacter = null;
+// State
+let characters = [];
+let currentCharacterId = null;
 
-// Fetch characters (GET /characters)
+// API Functions
 async function fetchCharacters() {
     try {
         const response = await fetch(API_URL);
-        if (!response.ok) throw new Error('Failed to fetch characters');
-        const characters = await response.json();
-        renderCharacterBar(characters);
-        if (characters.length) showCharacterDetails(characters[0]); // Default to first
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        characters = await response.json();
+        return characters;
     } catch (error) {
-        console.error('Fetch error:', error);
-        nameDisplay.textContent = 'Error loading characters';
+        console.error('Fetch characters error:', error);
+        elements.nameDisplay.textContent = 'Error loading characters';
+        return [];
     }
 }
 
-// Render character names in the bar
-function renderCharacterBar(characters) {
-    characterBar.innerHTML = '';
-    characters.forEach(character => {
-        const span = document.createElement('span');
-        span.textContent = character.name;
-        span.addEventListener('click', () => showCharacterDetails(character));
-        characterBar.appendChild(span);
-    });
-}
-
-// Show character details
-function showCharacterDetails(character) {
-    currentCharacter = character;
-    nameDisplay.textContent = character.name;
-    imageDisplay.src = character.image;
-    imageDisplay.alt = character.name;
-    voteCountDisplay.textContent = character.votes;
-}
-
-// Add votes (PATCH /characters/:id)
-async function addVotes(votes) {
+async function updateVotes(characterId, votes) {
     try {
-        const newVotes = parseInt(currentCharacter.votes, 10) + parseInt(votes, 10);
-        const response = await fetch(`${API_URL}/${currentCharacter.id}`, {
+        const response = await fetch(`${API_URL}/${characterId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ votes: newVotes }),
+            body: JSON.stringify({ votes }),
         });
-        if (!response.ok) throw new Error('Failed to update votes');
-        const updatedCharacter = await response.json();
-        currentCharacter.votes = updatedCharacter.votes;
-        voteCountDisplay.textContent = updatedCharacter.votes;
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        return await response.json();
     } catch (error) {
-        console.error('PATCH error:', error);
-        voteCountDisplay.textContent = 'Error updating votes';
+        console.error('Update votes error:', error);
+        elements.voteCount.textContent = 'Error';
+        return null;
     }
 }
 
-// Reset votes (PATCH /characters/:id)
-async function resetVotes() {
-    try {
-        const response = await fetch(`${API_URL}/${currentCharacter.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ votes: 0 }),
-        });
-        if (!response.ok) throw new Error('Failed to reset votes');
-        const updatedCharacter = await response.json();
-        currentCharacter.votes = updatedCharacter.votes;
-        voteCountDisplay.textContent = updatedCharacter.votes;
-    } catch (error) {
-        console.error('PATCH error:', error);
-        voteCountDisplay.textContent = 'Error resetting votes';
-    }
-}
-
-// Add new character (POST /characters)
-async function addNewCharacter(name, imageUrl) {
-    const newCharacter = { name, image: imageUrl, votes: 0 };
+async function addNewCharacter(name, image) {
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newCharacter),
+            body: JSON.stringify({ name, image, votes: 0 }),
         });
-        if (!response.ok) throw new Error('Failed to add character');
-        const savedCharacter = await response.json();
-        const span = document.createElement('span');
-        span.textContent = savedCharacter.name;
-        span.addEventListener('click', () => showCharacterDetails(savedCharacter));
-        characterBar.appendChild(span);
-        showCharacterDetails(savedCharacter); // Show immediately
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        return await response.json();
     } catch (error) {
-        console.error('POST error:', error);
-        nameDisplay.textContent = 'Error adding character';
+        console.error('Add character error:', error);
+        elements.nameDisplay.textContent = 'Error adding character';
+        return null;
     }
+}
+
+// DOM Manipulation Functions
+function renderCharacterBar() {
+    elements.characterBar.innerHTML = '';
+    characters.forEach(character => {
+        const span = document.createElement('span');
+        span.textContent = character.name;
+        span.addEventListener('click', () => showCharacterDetails(character.id));
+        elements.characterBar.appendChild(span);
+    });
+}
+
+function showCharacterDetails(characterId) {
+    const character = characters.find(c => c.id === characterId);
+    if (!character) return;
+    currentCharacterId = characterId;
+    elements.nameDisplay.textContent = character.name;
+    elements.image.src = character.image;
+    elements.image.alt = character.name;
+    elements.voteCount.textContent = character.votes;
 }
 
 // Event Handlers
 function handleVoteSubmit(event) {
     event.preventDefault();
-    const votes = votesInput.value.trim();
-    if (votes && !isNaN(votes) && currentCharacter) {
-        addVotes(votes);
-        votesInput.value = '';
+    const votesToAdd = parseInt(elements.votesInput.value, 10);
+    if (!currentCharacterId || isNaN(votesToAdd) || votesToAdd <= 0) {
+        elements.votesInput.value = '';
+        return;
     }
+
+    const character = characters.find(c => c.id === currentCharacterId);
+    const newVotes = character.votes + votesToAdd;
+    updateVotes(currentCharacterId, newVotes).then(updatedCharacter => {
+        if (updatedCharacter) {
+            character.votes = updatedCharacter.votes;
+            elements.voteCount.textContent = updatedCharacter.votes;
+            elements.votesInput.value = '';
+        }
+    });
 }
 
 function handleReset() {
-    if (currentCharacter) resetVotes();
+    if (!currentCharacterId) return;
+    updateVotes(currentCharacterId, 0).then(updatedCharacter => {
+        if (updatedCharacter) {
+            const character = characters.find(c => c.id === currentCharacterId);
+            character.votes = updatedCharacter.votes;
+            elements.voteCount.textContent = updatedCharacter.votes;
+        }
+    });
 }
 
 function handleNewCharacter(event) {
     event.preventDefault();
-    const name = document.getElementById('name').value.trim();
-    const imageUrl = document.getElementById('image-url').value.trim();
-    if (name && imageUrl) {
-        addNewCharacter(name, imageUrl);
-        event.target.reset();
-    }
+    const name = elements.newNameInput.value.trim();
+    const image = elements.imageUrlInput.value.trim();
+    if (!name || !image) return;
+
+    addNewCharacter(name, image).then(newCharacter => {
+        if (newCharacter) {
+            characters.push(newCharacter);
+            renderCharacterBar();
+            showCharacterDetails(newCharacter.id);
+            elements.characterForm.reset();
+        }
+    });
 }
 
 // Initialize
 function init() {
-    votesForm.addEventListener('submit', handleVoteSubmit);
-    resetBtn.addEventListener('click', handleReset);
-    characterForm.addEventListener('submit', handleNewCharacter);
-    fetchCharacters();
+    elements.votesForm.addEventListener('submit', handleVoteSubmit);
+    elements.resetBtn.addEventListener('click', handleReset);
+    elements.characterForm.addEventListener('submit', handleNewCharacter);
+
+    fetchCharacters().then(data => {
+        if (data.length) {
+            renderCharacterBar();
+            showCharacterDetails(data[0].id);
+        }
+    });
 }
 
 init();
